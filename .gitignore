@@ -1,0 +1,13 @@
+# Ignore binaries
+logAnalyzer
+*.o
+
+# Ignore OS-specific files
+.DS_Store
+
+# Ignore large data
+datasets/
+results_*.txt
+
+# Ignore sockets
+*.sock
