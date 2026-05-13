@@ -1,90 +1,90 @@
-# LogAnalyser
+# Log Analyser
 
-Ferramenta em C para análise e classificação de logs de sistemas e servidores web. Suporta múltiplos formatos de log e classifica eventos por tipo (segurança, performance, tráfego, erro) e severidade.
+A tool in C for analyzing and classifying system and web server logs. It supports multiple log formats and classifies events by type (security, performance, traffic, error) and severity.
 
 ---
 
-## Estrutura do Projeto
+## Project Structure
 
 ```
 LogAnalyser/
-├── src/                        # Código-fonte principal
-│   ├── log_parser.h            # Definições de estruturas e protótipos dos parsers
-│   ├── log_parser.c            # Implementação dos parsers de log
-│   ├── event_classifier.h      # Definições de tipos de eventos e protótipos do classificador
-│   ├── event_classifier.c      # Implementação da lógica de classificação de eventos
-│   ├── test_parsers.c          # Testes unitários para os parsers
-│   ├── test_classifier.c       # Testes unitários para o classificador de eventos
-│   └── Makefile                # Sistema de build (compatível Linux/macOS)
+├── src/                        # Main source code
+│   ├── log_parser.h            # Structure definitions and parser prototypes
+│   ├── log_parser.c            # Implementation of log parsers
+│   ├── event_classifier.h      # Event type definitions and classifier prototypes
+│   ├── event_classifier.c      # Implementation of event classification logic
+│   ├── test_parsers.c          # Unit tests for parsers
+│   ├── test_classifier.c       # Unit tests for the event classifier
+│   └── Makefile                # Build system (Linux/macOS compatible)
 │
-├── generators/                 # Geradores de dados sintéticos para testes
-│   ├── generate_apache_logs.c  # Gerador de logs no formato Apache Combined Log
-│   ├── generate_json_logs.c    # Gerador de logs estruturados em JSON
-│   ├── generate_syslog.c       # Gerador de logs no formato Syslog (RFC 3164)
-│   └── generate_nginx_error.c  # Gerador de logs de erro do Nginx
+├── generators/                 # Synthetic data generators for testing
+│   ├── generate_apache_logs.c  # Apache Combined Log format generator
+│   ├── generate_json_logs.c    # JSON structured log generator
+│   ├── generate_syslog.c       # Syslog format generator (RFC 3164)
+│   └── generate_nginx_error.c  # Nginx error log generator
 │
-├── datasets/                   # Datasets de teste gerados automaticamente (criados pelo Makefile)
-│   ├── apache/                 # Logs Apache gerados
-│   ├── json_logs/              # Logs JSON gerados
-│   ├── syslog/                 # Logs Syslog gerados
-│   └── nginx/                  # Logs Nginx gerados
+├── datasets/                   # Automatically generated test datasets (created by Makefile)
+│   ├── apache/                 # Generated Apache logs
+│   ├── json_logs/              # Generated JSON logs
+│   ├── syslog/                 # Generated Syslog logs
+│   └── nginx/                  # Generated Nginx logs
 │
-└── docs/                       # Documentação
-    └── eventos.md              # Guia completo de classificação de eventos
+└── docs/                       # Documentation
+    └── events.md               # Complete guide to event classification
 ```
 
 ---
 
-## Módulos
+## Modules
 
-### `src/log_parser` — Parsers de Log
+### `src/log_parser` — Log Parsers
 
-Responsável por fazer o parsing das quatro fontes de log suportadas, convertendo linhas de texto em estruturas C tipadas.
+Responsible for parsing the four supported log sources, converting text lines into typed C structures.
 
-| Formato | Estrutura | Função de parsing |
+| Format | Structure | Parsing Function |
 |---|---|---|
 | Apache Combined Log | `ApacheLogEntry` | `parse_apache_log()` |
 | JSON Structured Log | `JSONLogEntry` | `parse_json_log()` |
 | Syslog (RFC 3164) | `SyslogEntry` | `parse_syslog()` |
 | Nginx Error Log | `NginxErrorEntry` | `parse_nginx_error()` |
 
-Cada entrada captura campos relevantes: IP de origem, timestamp, nível de severidade, serviço, mensagem, entre outros específicos de cada formato.
+Each entry captures relevant fields: source IP, timestamp, severity level, service, message, among others specific to each format.
 
 ---
 
-### `src/event_classifier` — Classificador de Eventos
+### `src/event_classifier` — Event Classifier
 
-Analisa as entradas já processadas pelos parsers e classifica cada evento com um ou mais tipos (via bitmask) e um nível de severidade.
+Analyzes entries already processed by the parsers and classifies each event with one or more types (via bitmask) and a severity level.
 
-**Tipos de evento (`EventType`):**
+**Event Types (`EventType`):**
 
 | Flag | Valor | Descrição |
 |---|---|---|
-| `EVENT_SECURITY` | `1 << 0` | Autenticação, acessos negados, ataques |
-| `EVENT_PERFORMANCE` | `1 << 1` | Timeouts, erros de servidor, crashes |
-| `EVENT_TRAFFIC` | `1 << 2` | Padrões de tráfego e utilização |
-| `EVENT_ERROR` | `1 << 3` | Erros aplicacionais |
-| `EVENT_NORMAL` | `1 << 4` | Operação normal |
+| `EVENT_SECURITY` | `1 << 0` | Authentication, denied access, attacks |
+| `EVENT_PERFORMANCE` | `1 << 1` | Timeouts, server errors, crashes |
+| `EVENT_TRAFFIC` | `1 << 2` | Traffic patterns and utilization |
+| `EVENT_ERROR` | `1 << 3` | Application errors |
+| `EVENT_NORMAL` | `1 << 4` | Normal operation |
 
-**Níveis de severidade:**
+**Severity Levels:**
 
-| Nível | Valor | Descrição |
+| Level | Value | Description |
 |---|---|---|
-| INFO | 0 | Operação normal |
-| LOW | 1 | Anomalia menor |
-| MEDIUM | 2 | Requer atenção |
-| HIGH | 3 | Ação necessária |
-| CRITICAL | 4 | Falha crítica |
+| INFO | 0 | Normal operation |
+| LOW | 1 | Minor anomaly |
+| MEDIUM | 2 | Requires attention |
+| HIGH | 3 | Action required |
+| CRITICAL | 4 | Critical failure |
 
-**Modos de análise (`AnalysisMode`):** Os modos `MODE_SECURITY`, `MODE_PERFORMANCE`, `MODE_TRAFFIC` e `MODE_FULL` permitem filtrar eventos por categoria usando OR bitwise.
+**Analysis Modes (`AnalysisMode`):** The modes `MODE_SECURITY`, `MODE_PERFORMANCE`, `MODE_TRAFFIC` and `MODE_FULL` allow filtering events by category using bitwise OR.
 
 ---
 
-### `generators/` — Geradores de Datasets
+### `generators/` — Dataset Generators
 
-Programas C independentes que produzem logs sintéticos realistas para testes. Recebem como argumento o número de linhas/ficheiros a gerar e escrevem o output para `stdout` ou para uma pasta.
+Independent C programs that produce realistic synthetic logs for testing. They take the number of lines/files to generate as an argument and write the output to `stdout` or to a folder.
 
-| Gerador | Binário compilado | Output |
+| Generator | Compiled Binary | Output |
 |---|---|---|
 | `generate_apache_logs.c` | `gen_apache` | `datasets/apache/` |
 | `generate_json_logs.c` | `gen_json` | `datasets/json_logs/` |
@@ -93,30 +93,30 @@ Programas C independentes que produzem logs sintéticos realistas para testes. R
 
 ---
 
-### `docs/eventos.md` — Guia de Classificação
+### `docs/eventos.md` — Classification Guide
 
-Documentação detalhada com a lógica de classificação para cada formato de log, incluindo tabelas de referência para status codes HTTP, padrões de ataque (SQL Injection, XSS, Path Traversal), mapeamento de severidade Syslog e exemplos práticos de cenários reais (ataques de força bruta, scans de vulnerabilidades, cascatas de falhas de performance).
+Detailed documentation containing the classification logic for each log format, including reference tables for HTTP status codes, attack patterns (SQL Injection, XSS, Path Traversal), Syslog severity mapping, and practical examples of real-world scenarios (brute-force attacks, vulnerability scans, performance failure cascades).
 
 ---
 
-## Build e Utilização
+## Build and Usage
 
-O Makefile encontra-se em `src/`. Todos os comandos devem ser executados a partir dessa pasta.
+The Makefile is located in `src/`. All commands must be executed from that folder.
 
 ```bash
 cd src/
 
-make              # Compila tudo (parsers, classificador, geradores)
-make datasets     # Gera datasets de teste (~1 MB)
-make run-tests    # Compila e executa a suite de testes
-make clean        # Remove binários compilados
-make help         # Lista todos os targets disponíveis
+make              # Compiles everything (parsers, classifier, generators)
+make datasets     # Generates test datasets (~1 MB)
+make run-tests    # Compiles and runs the test suite
+make clean        # Removes compiled binaries
+make help         # Lists all available targets
 ```
 
-Para gerar datasets maiores (útil para testes de performance):
+To generate larger datasets (useful for performance testing):
 
 ```bash
-make datasets-large   # Gera datasets grandes (~15 MB)
+make datasets-large    # Generates large datasets (~15 MB)
 ```
 
-**Requisitos:** GCC, Make, suporte a POSIX threads (`-pthread`). Compatível com Linux e macOS.
+**Requirements:** GCC, Make, POSIX threads support (`-pthread`). Compatible with Linux and macOS.
