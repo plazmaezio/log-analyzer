@@ -1,4 +1,4 @@
-# Log Analyser
+# Log analyser
 
 A tool in C for analyzing and classifying system and web server logs. It supports multiple log formats and classifies events by type (security, performance, traffic, error) and severity.
 
@@ -7,7 +7,7 @@ A tool in C for analyzing and classifying system and web server logs. It support
 ## Project Structure
 
 ```
-LogAnalyser/
+Loganalyser/
 ├── src/                        # Main source code
 │   ├── log_parser.h            # Structure definitions and parser prototypes
 │   ├── log_parser.c            # Implementation of log parsers

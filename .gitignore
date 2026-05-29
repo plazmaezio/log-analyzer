@@ -1,13 +1,22 @@
-# Ignore binaries
-logAnalyzer
+# Ignore all files without extensions globally
+*
+!*/
+!*.*
+
+# Keep Makefile
+!Makefile
+
+# Ignore object files everywhere (placed AFTER the rescue rules)
 *.o
 
-# Ignore OS-specific files
+# Ignore Windows Zone Identifier metadata clutter
+*:Zone.Identifier
 .DS_Store
 
-# Ignore large data
-datasets/
-results_*.txt
+# Ignore large data but keep the datasets folder structure
+datasets/**/*
+!datasets/**/
 
-# Ignore sockets
+# Ignore results files and sockets
+results_*.txt
 *.sock

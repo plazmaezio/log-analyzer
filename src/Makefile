@@ -1,9 +1,9 @@
-# Makefile para o projeto Log Analyzer (compatível Linux/macOS)
+# Makefile for the Log analyser project (Linux/macOS compatible)
 
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -I.
 
-# Detectar sistema operativo
+# Detect operating system
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     LDFLAGS = -lrt -pthread
@@ -12,7 +12,7 @@ ifeq ($(UNAME_S),Darwin)
     LDFLAGS = -pthread
 endif
 
-# Ficheiros
+# Files
 PARSER_SRC = log_parser.c
 PARSER_OBJ = log_parser.o
 EVENT_SRC = event_classifier.c
@@ -23,7 +23,10 @@ TEST_BIN = test_parsers
 CLASSIFIER_SRC = test_classifier.c
 CLASSIFIER_BIN = test_classifier
 
-# Geradores
+ANALYSER_SRC = logAnalyser.c
+ANALYSER_BIN = logAnalyser
+
+# Generators
 GEN_DIR = ../generators
 GEN_APACHE = $(GEN_DIR)/gen_apache
 GEN_JSON = $(GEN_DIR)/gen_json
@@ -41,19 +44,19 @@ NGINX_DIR = $(DATASET_DIR)/nginx
 
 all: classifier test generators
 
-# Compilar Classificador
+# Compile Classifier
 classifier: $(CLASSIFIER_BIN)
 
 $(CLASSIFIER_BIN): $(CLASSIFIER_SRC) $(PARSER_OBJ) $(EVENT_OBJ)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-	@echo "✓ Classificador compilado: ./$(CLASSIFIER_BIN)"
+	@echo "✓ Classifier compiled: ./$(CLASSIFIER_BIN)"
 
-# Compilar testes
+# Compile tests
 test: $(TEST_BIN)
 
 $(TEST_BIN): $(TEST_SRC) $(PARSER_OBJ)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-	@echo "✓ Test suite compilado: ./$(TEST_BIN)"
+	@echo "✓ Test suite compiled: ./$(TEST_BIN)"
 
 $(PARSER_OBJ): $(PARSER_SRC)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -61,64 +64,64 @@ $(PARSER_OBJ): $(PARSER_SRC)
 $(EVENT_OBJ): $(EVENT_SRC)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Compilar geradores
+# Compile generators
 generators: $(GEN_APACHE) $(GEN_JSON) $(GEN_SYSLOG) $(GEN_NGINX)
 
 $(GEN_APACHE): $(GEN_DIR)/generate_apache_logs.c
 	$(CC) -O2 $< -o $@
-	@echo "✓ Gerador Apache compilado"
+	@echo "✓ Apache generator compiled"
 
 $(GEN_JSON): $(GEN_DIR)/generate_json_logs.c
 	$(CC) -O2 $< -o $@
-	@echo "✓ Gerador JSON compilado"
+	@echo "✓ JSON generator compiled"
 
 $(GEN_SYSLOG): $(GEN_DIR)/generate_syslog.c
 	$(CC) -O2 $< -o $@
-	@echo "✓ Gerador Syslog compilado"
+	@echo "✓ Syslog generator compiled"
 
 $(GEN_NGINX): $(GEN_DIR)/generate_nginx_error.c
 	$(CC) -O2 $< -o $@
-	@echo "✓ Gerador Nginx compilado"
+	@echo "✓ Nginx generator compiled"
 
-# Gerar datasets
+# Generate datasets
 datasets: generators
-	@echo "Gerando datasets de teste..."
+	@echo "Generating test datasets..."
 	@mkdir -p $(APACHE_DIR) $(JSON_DIR) $(SYSLOG_DIR) $(NGINX_DIR)
 	@./$(GEN_APACHE) 1000 > $(APACHE_DIR)/sample_1k.log 2>&1
-	@echo "  ✓ Apache: 1K linhas geradas"
+	@echo "  ✓ Apache: 1K lines generated"
 	@./$(GEN_JSON) 500 50 $(JSON_DIR)/ 2>&1
-	@echo "  ✓ JSON: 500 linhas em 50 ficheiros"
+	@echo "  ✓ JSON: 500 lines across 50 files"
 	@./$(GEN_SYSLOG) 500 > $(SYSLOG_DIR)/sample_500.log 2>&1
-	@echo "  ✓ Syslog: 500 linhas geradas"
+	@echo "  ✓ Syslog: 500 lines generated"
 	@./$(GEN_NGINX) 300 > $(NGINX_DIR)/sample_300.log 2>&1
-	@echo "  ✓ Nginx: 300 linhas geradas"
+	@echo "  ✓ Nginx: 300 lines generated"
 	@echo ""
-	@echo "Datasets criados:"
+	@echo "Datasets created:"
 	@du -sh $(DATASET_DIR)/*
 
-# Gerar datasets grandes
+# Generate large datasets
 datasets-large: generators
-	@echo "Gerando datasets GRANDES (pode demorar)..."
+	@echo "Generating LARGE datasets (this may take a while)..."
 	@mkdir -p $(APACHE_DIR) $(JSON_DIR) $(SYSLOG_DIR) $(NGINX_DIR)
 	@./$(GEN_APACHE) 100000 > $(APACHE_DIR)/access_100k.log 2>&1
-	@echo "  ✓ Apache: 100K linhas (~10 MB)"
+	@echo "  ✓ Apache: 100K lines (~10 MB)"
 	@./$(GEN_JSON) 50000 500 $(JSON_DIR)/ 2>&1
-	@echo "  ✓ JSON: 50K linhas em 500 ficheiros"
+	@echo "  ✓ JSON: 50K lines across 500 files"
 	@./$(GEN_SYSLOG) 50000 > $(SYSLOG_DIR)/security_50k.log 2>&1
-	@echo "  ✓ Syslog: 50K linhas (~2 MB)"
+	@echo "  ✓ Syslog: 50K lines (~2 MB)"
 	@./$(GEN_NGINX) 20000 > $(NGINX_DIR)/error_20k.log 2>&1
-	@echo "  ✓ Nginx: 20K linhas (~1 MB)"
+	@echo "  ✓ Nginx: 20K lines (~1 MB)"
 	@echo ""
 	@du -sh $(DATASET_DIR)/*
 
-# Executar testes
+# Run tests
 run-tests: test datasets
 	@echo ""
-	@echo "Executando suite de testes..."
+	@echo "Running test suite..."
 	@echo ""
 	@./$(TEST_BIN)
 
-# Limpar ficheiros compilados
+# Clean compiled files
 clean:
 	rm -f $(PARSER_OBJ)
 	rm -f $(EVENT_OBJ)
@@ -130,32 +133,40 @@ clean:
 	rm -f $(SYSLOG_DIR)/*
 	rm -f $(NGINX_DIR)/*
 	
-	@echo "✓ Ficheiros compilados removidos"
+	@echo "✓ Compiled files removed"
 
-# Limpar tudo incluindo datasets
+# Clean everything including datasets
 clean-all: clean
 	rm -rf $(DATASET_DIR)
-	@echo "✓ Datasets removidos"
+	@echo "✓ Datasets removed"
 
-# Ajuda
+# Help
 help:
-	@echo "Makefile - Log Analyzer Project"
+	@echo "Makefile - Log analyser Project"
 	@echo ""
-	@echo "Sistema detectado: $(UNAME_S)"
+	@echo "Detected system: $(UNAME_S)"
 	@echo ""
-	@echo "Targets disponíveis:"
-	@echo "  make              	- Compila testes, geradores de logs e classificador de eventos"
-	@echo "  make test         	- Compila apenas os testes"
-	@echo "  make generators   	- Compila geradores de logs"
-	@echo "  make classifier   	- Compila o classificador de eventos"
-	@echo "  make datasets     	- Gera datasets pequenos (~1MB)"
-	@echo "  make datasets-large 	- Gera datasets grandes (~15MB)"
-	@echo "  make run-tests    	- Compila e executa testes"
-	@echo "  make clean        	- Remove ficheiros compilados"
-	@echo "  make clean-all    	- Remove tudo (incluindo datasets)"
-	@echo "  make help         	- Mostra esta ajuda"
+	@echo "Available targets:"
+	@echo "  make               - Compiles tests, log generators, and event classifier"
+	@echo "  make test          - Compiles only the tests"
+	@echo "  make generators    - Compiles log generators"
+	@echo "  make classifier    - Compiles the event classifier"
+	@echo "  make datasets      - Generates small datasets (~1MB)"
+	@echo "  make datasets-large- Generates large datasets (~15MB)"
+	@echo "  make run-tests     - Compiles and runs tests"
+	@echo "  make clean         - Removes compiled files"
+	@echo "  make clean-all     - Removes everything (including datasets)"
+	@echo "  make help          - Shows this help message"
 	@echo ""
-	@echo "Uso típico:"
-	@echo "  1. make              # Compilar tudo"
-	@echo "  2. make datasets     # Gerar dados"
-	@echo "  3. make run-tests    # Testar"
+	@echo "Typical usage:"
+	@echo "  1. make              # Compile everything"
+	@echo "  2. make datasets     # Generate data"
+	@echo "  3. make run-tests    # Test"
+	
+
+# Compile analyser (main program)
+analyser: $(ANALYSER_BIN)
+
+$(ANALYSER_BIN): $(ANALYSER_SRC) $(PARSER_OBJ) $(EVENT_OBJ)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+	@echo "✓ analyser compiled: ./$(ANALYSER_BIN)"
