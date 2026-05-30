@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <dirent.h>
 
 #define COLOR_RED "\033[0;31m"
 #define COLOR_YELLOW "\033[0;33m"
@@ -88,8 +90,26 @@ void print_event(const ClassifiedEvent *event, AnalysisMode mode)
          COLOR_RESET);
 }
 
+int isDirectory(const char *path)
+{
+  struct stat path_stat;
+  if (stat(path, &path_stat) == -1)
+  {
+    fprintf(stderr, "Error: Unable to access '%s'.\n", path);
+    return -1;
+  }
+
+  if (!S_ISDIR(path_stat.st_mode))
+  {
+    fprintf(stderr, "Error: '%s' is not a directory. This tool requires a directory path.\n", path);
+    return 0;
+  }
+
+  return 1;
+}
+
 static void parse_options(int argc, char *argv[],
-                          char **log_dir,
+                          char *log_dir,
                           int *num_processes,
                           AnalysisMode *mode,
                           int *verbose,
@@ -103,9 +123,14 @@ static void parse_options(int argc, char *argv[],
   }
 
   // Mandatory
-  *log_dir = argv[1];
+  strcpy(log_dir, argv[1]);
   *num_processes = atoi(argv[2]);
   assign_analysis_mode(argv[3], mode);
+
+  if (!isDirectory(log_dir))
+  {
+    exit(1);
+  }
 
   // Defaults
   *verbose = 0;
@@ -136,7 +161,7 @@ static void parse_options(int argc, char *argv[],
   }
 
   fprintf(stderr, "Log analyser | Dir: %s | Processes: %d | Mode: %s | Verbose: %s | Output: %s\n\n",
-          *log_dir, *num_processes, argv[3],
+          log_dir, *num_processes, argv[3],
           *verbose ? "yes" : "no",
           *output_file ? *output_file : "stdout");
   // write(STDERR_FILENO, buf, len);
@@ -215,6 +240,14 @@ void analyse_log_stream(int source_fd, int *total_lines, int *matched_events, in
       }
     }
   }
+
+  // safety measure: in case there is a line that doesn't end with '\n'
+  if (line_length > 0)
+  {
+    current_line[line_length] = '\0';
+    (*total_lines)++;
+    analyse_log(current_line, matched_events, type_of_event, severity_counts, mode);
+  }
 }
 
 void print_summary(int total_lines, int matched_events, int *type_of_event, int *severity_counts)
@@ -243,31 +276,80 @@ void print_summary(int total_lines, int matched_events, int *type_of_event, int 
   printf("  Unknown: %d\n", type_of_event[4]);
 }
 
-int main(int argc, char *argv[])
+void process_directory_recursive(const char *dir_path, int *total_lines, int *matched_events, int *type_of_event, int *severity_counts, AnalysisMode mode)
 {
-  AnalysisMode mode;
-  char *input_filename, *output_file;
-  int num_processes, verbose;
-
-  parse_options(argc, argv, &input_filename, &num_processes, &mode, &verbose, &output_file);
-
-  // open input file
-  printf("Analyzing file %s in mode: %s\n\n", input_filename, get_mode_name(mode));
-  int source_fd = open(input_filename, O_RDONLY);
-  if (source_fd == -1)
+  DIR *dir = opendir(dir_path);
+  if (dir == NULL)
   {
-    perror("Opening input file");
-    exit(1);
+    perror("Error opening directory");
+    return;
   }
 
+  struct dirent *entry;
+
+  while ((entry = readdir(dir)) != NULL)
+  {
+    // Skip the "." (current directory) and ".." (parent directory) loops
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+    {
+      continue;
+    }
+
+    // Construct the full path: "directory/filename"
+    char next_path[4096];
+    snprintf(next_path, sizeof(next_path), "%s/%s", dir_path, entry->d_name);
+
+    struct stat path_stat;
+    if (stat(next_path, &path_stat) != 0)
+    {
+      continue;
+    }
+
+    // If it's a directory, recurse into it
+    if (S_ISDIR(path_stat.st_mode))
+    {
+      process_directory_recursive(next_path, total_lines, matched_events, type_of_event, severity_counts, mode);
+    }
+    // If it's a file, check if it ends with ".log"
+    else if (S_ISREG(path_stat.st_mode))
+    {
+      size_t len = strlen(entry->d_name);
+      if ((len > 4 && strcmp(entry->d_name + len - 4, ".log") == 0) ||
+          (len > 5 && strcmp(entry->d_name + len - 5, ".json") == 0))
+      {
+
+        printf("Analyzing file %s in mode: %s\n\n", next_path, get_mode_name(mode));
+        int source_fd = open(next_path, O_RDONLY);
+        if (source_fd != -1)
+        {
+          analyse_log_stream(source_fd, total_lines, matched_events, type_of_event, severity_counts, mode);
+          close(source_fd);
+        }
+        else
+        {
+          perror("Warning: Could not open file");
+        }
+      }
+    }
+  }
+
+  closedir(dir);
+}
+
+int main(int argc, char *argv[])
+{
+  AnalysisMode mode = MODE_FULL;
+  char input_directory[4096];
+  char *output_file = NULL;
+  int num_processes, verbose;
   int total_lines = 0;
   int matched_events = 0;
   int severity_counts[5] = {0}; // 5 levels of severity: INFO, LOW, MEDIUM, HIGH, CRITICAL
-  int type_of_event[5] = {0};
+  int type_of_event[5] = {0};   // 5 types: Apache, Syslog, Nginx, JSON, Unknown
 
-  analyse_log_stream(source_fd, &total_lines, &matched_events, type_of_event, severity_counts, mode);
+  parse_options(argc, argv, input_directory, &num_processes, &mode, &verbose, &output_file);
 
-  close(source_fd);
+  process_directory_recursive(input_directory, &total_lines, &matched_events, type_of_event, severity_counts, mode);
 
   print_summary(total_lines, matched_events, type_of_event, severity_counts);
 
