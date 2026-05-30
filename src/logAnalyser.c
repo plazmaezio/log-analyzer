@@ -142,112 +142,84 @@ static void parse_options(int argc, char *argv[],
   // write(STDERR_FILENO, buf, len);
 }
 
-int main(int argc, char *argv[])
+void record_and_print_event(ClassifiedEvent *event, int *matched_events, int *type_of_event, int *severity_counts, int event_type, AnalysisMode mode)
 {
-
-  char *input_filename, *output_file;
-  AnalysisMode mode;
-  int num_processes, verbose;
-  parse_options(argc, argv, &input_filename, &num_processes, &mode, &verbose, &output_file);
-
-  // open input file
-  printf("Analyzing file %s in mode: %s\n\n", input_filename, get_mode_name(mode));
-  int source_fd = open(input_filename, O_RDONLY);
-  if (source_fd == -1)
+  (*matched_events)++;
+  type_of_event[event_type]++;
+  severity_counts[event->severity]++;
+  if (event_matches_mode(event, mode))
   {
-    perror("Opening input file");
-    exit(1);
+    print_event(event, mode);
   }
+}
 
-  // 5 levels of severity: INFO, LOW, MEDIUM, HIGH, CRITICAL
-  int severity_counts[5] = {0};
-  int type_of_event[5] = {0};
+void analyse_log(const char *line, int *matched_events, int *type_of_event, int *severity_counts, AnalysisMode mode)
+{
+  ClassifiedEvent event;
+  ApacheLogEntry apache_entry;
+  JSONLogEntry json_entry;
+  SyslogEntry syslog_entry;
+  // NginxErrorEntry nginx_entry;
 
+  if (parse_apache_log(line, &apache_entry) == 0)
+  {
+    classify_apache_event(&apache_entry, &event);
+    record_and_print_event(&event, matched_events, type_of_event, severity_counts, 0, mode);
+  }
+  else if (parse_json_log(line, &json_entry) == 0)
+  {
+    classify_json_event(&json_entry, &event);
+    record_and_print_event(&event, matched_events, type_of_event, severity_counts, 3, mode);
+  }
+  else if (parse_syslog(line, &syslog_entry) == 0)
+  {
+    classify_syslog_event(&syslog_entry, &event);
+    record_and_print_event(&event, matched_events, type_of_event, severity_counts, 1, mode);
+  }
+  // TO DO: add nginx error log parsing
+  // else if (parse_nginx_error(line, &nginx_entry) == 0)
+  // {
+  //   classify_nginx_event(&nginx_entry, &event);
+  //   record_and_print_event(&event, matched_events, type_of_event, severity_counts, 2, mode);
+  // }
+  else
+  {
+    type_of_event[4]++;
+  }
+}
+
+void analyse_log_stream(int source_fd, int *total_lines, int *matched_events, int *type_of_event, int *severity_counts, AnalysisMode mode)
+{
   char read_buffer[4096];
   char current_line[4096];
-  int bytes_read = 0;
+  ssize_t bytes_read = 0;
   unsigned int line_length = 0;
-  int total_lines = 0;
-  int matched_events = 0;
 
-  // GET LINE BY LINE AND CLASSIFY
   while ((bytes_read = read(source_fd, read_buffer, sizeof(read_buffer))) > 0)
   {
+    // Process each character in the buffer and build lines
     for (int buffer_index = 0; buffer_index < bytes_read; buffer_index++)
     {
       char current_char = read_buffer[buffer_index];
-
       current_line[line_length++] = current_char;
 
       // When a line is complete
       if (current_char == '\n' || line_length >= sizeof(current_line) - 1)
       {
         current_line[line_length] = '\0'; // Null-terminate to create a valid C-string
-        total_lines++;
+        (*total_lines)++;
 
-        ClassifiedEvent event;
-
-        ApacheLogEntry apache_entry;
-        JSONLogEntry json_entry;
-        SyslogEntry syslog_entry;
-        // NginxErrorEntry nginx_entry;
-        if (parse_apache_log(current_line, &apache_entry) == 0)
-        {
-          classify_apache_event(&apache_entry, &event);
-          matched_events++;
-          type_of_event[0]++;
-          severity_counts[event.severity]++;
-          if (event_matches_mode(&event, mode))
-          {
-            print_event(&event, mode);
-          }
-        }
-        /* TO DO: Add Nginx parser and classifier and uncomment this block
-        else if (parse_nginx_error(current_line, &nginx_entry) == 0) {
-            classify_nginx_event(&nginx_entry, &event);
-            matched_events++;
-            type_of_event[2]++;
-            severity_counts[event.severity]++;
-            if(event_matches_mode(&event, mode)) {
-                print_event(&event, mode);
-            }
-        }
-        */
-        else if (parse_json_log(current_line, &json_entry) == 0)
-        {
-          classify_json_event(&json_entry, &event);
-          matched_events++;
-          type_of_event[3]++;
-          severity_counts[event.severity]++;
-          if (event_matches_mode(&event, mode))
-          {
-            print_event(&event, mode);
-          }
-        }
-        else if (parse_syslog(current_line, &syslog_entry) == 0)
-        {
-          classify_syslog_event(&syslog_entry, &event);
-          matched_events++;
-          type_of_event[1]++;
-          severity_counts[event.severity]++;
-          if (event_matches_mode(&event, mode))
-          {
-            print_event(&event, mode);
-          }
-        }
-        else
-        {
-          type_of_event[4]++;
-        }
+        analyse_log(current_line, matched_events, type_of_event, severity_counts, mode);
 
         line_length = 0;
       }
     }
   }
+}
 
-  close(source_fd);
+void print_summary(int total_lines, int matched_events, int *type_of_event, int *severity_counts)
+{
 
-  // Sumário
   printf("\n");
   printf("========================================\n");
   printf("SUMMARY\n");
@@ -269,6 +241,35 @@ int main(int argc, char *argv[])
   // printf("  Nginx:  %d\n", type_of_event[2]);
   printf("  JSON:   %d\n", type_of_event[3]);
   printf("  Unknown: %d\n", type_of_event[4]);
+}
+
+int main(int argc, char *argv[])
+{
+  AnalysisMode mode;
+  char *input_filename, *output_file;
+  int num_processes, verbose;
+
+  parse_options(argc, argv, &input_filename, &num_processes, &mode, &verbose, &output_file);
+
+  // open input file
+  printf("Analyzing file %s in mode: %s\n\n", input_filename, get_mode_name(mode));
+  int source_fd = open(input_filename, O_RDONLY);
+  if (source_fd == -1)
+  {
+    perror("Opening input file");
+    exit(1);
+  }
+
+  int total_lines = 0;
+  int matched_events = 0;
+  int severity_counts[5] = {0}; // 5 levels of severity: INFO, LOW, MEDIUM, HIGH, CRITICAL
+  int type_of_event[5] = {0};
+
+  analyse_log_stream(source_fd, &total_lines, &matched_events, type_of_event, severity_counts, mode);
+
+  close(source_fd);
+
+  print_summary(total_lines, matched_events, type_of_event, severity_counts);
 
   return 0;
 }
