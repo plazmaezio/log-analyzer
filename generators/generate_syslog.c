@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
     time_t now = time(NULL);
     time_t start = now - (14 * 24 * 60 * 60);  // 14 dias
     
-    fprintf(stderr, "Gerando %ld linhas de syslog...\n", num_lines);
+    printf(stderr, "Gerando %ld linhas de syslog...\n", num_lines);
     
     for (long i = 0; i < num_lines; i++) {
         time_t timestamp = start + (i * 14 * 24 * 60 * 60 / num_lines);
@@ -133,6 +133,6 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    fprintf(stderr, "\nConcluído!\n");
+    printf(stderr, "\nConcluído!\n");
     return 0;
 }
