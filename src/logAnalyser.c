@@ -3,6 +3,7 @@
 #include "event_classifier.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #define COLOR_RED "\033[0;31m"
 #define COLOR_YELLOW "\033[0;33m"
@@ -149,97 +150,102 @@ int main(int argc, char *argv[])
   int num_processes, verbose;
   parse_options(argc, argv, &input_filename, &num_processes, &mode, &verbose, &output_file);
 
-  // Determinar modo
-  //  assign_analysis_mode(mode_str, &mode);
-  // printf("Analyzing file %s in mode: %s\n\n", input_filename, get_mode_name(mode));
-
-  // change to more rudimentary file reading
-
+  // open input file
   printf("Analyzing file %s in mode: %s\n\n", input_filename, get_mode_name(mode));
-  FILE *fp = fopen(input_filename, "r");
-  if (!fp)
+  int source_fd = open(input_filename, O_RDONLY);
+  if (source_fd == -1)
   {
-    perror("fopen");
-    return 1;
+    perror("Opening input file");
+    exit(1);
   }
-
-  char line[4096];
-  int total_lines = 0;
-  int matched_events = 0;
 
   // 5 levels of severity: INFO, LOW, MEDIUM, HIGH, CRITICAL
   int severity_counts[5] = {0};
   int type_of_event[5] = {0};
+
+  char read_buffer[4096];
+  char current_line[4096];
+  int bytes_read = 0;
+  unsigned int line_length = 0;
+  int total_lines = 0;
+  int matched_events = 0;
+
   // GET LINE BY LINE AND CLASSIFY
-  while (fgets(line, sizeof(line), fp))
+  while ((bytes_read = read(source_fd, read_buffer, sizeof(read_buffer))) > 0)
   {
-    // fprintf(stdout, "Processing line %s...\n", line);
-    total_lines++;
-
-    ClassifiedEvent event;
-
-    // Attempt to match to apache
-    ApacheLogEntry apache_entry;
-    if (parse_apache_log(line, &apache_entry) == 0)
+    for (int buffer_index = 0; buffer_index < bytes_read; buffer_index++)
     {
-      classify_apache_event(&apache_entry, &event);
-      matched_events++;
-      type_of_event[0]++;
-      severity_counts[event.severity]++;
-      if (event_matches_mode(&event, mode))
-      {
-        print_event(&event, mode);
-      }
-      continue;
-    }
+      char current_char = read_buffer[buffer_index];
 
-    /* TO DO: Add Nginx parser and classifier and uncomment this block
-    NginxErrorEntry nginx_entry;
-    if (parse_nginx_error(line, &nginx_entry) == 0) {
-        printf("Matched Nginx\n");
-        classify_nginx_event(&nginx_entry, &event);
-        if(event_matches_mode(&event, mode)) {
+      current_line[line_length++] = current_char;
+
+      // When a line is complete
+      if (current_char == '\n' || line_length >= sizeof(current_line) - 1)
+      {
+        current_line[line_length] = '\0'; // Null-terminate to create a valid C-string
+        total_lines++;
+
+        ClassifiedEvent event;
+
+        ApacheLogEntry apache_entry;
+        JSONLogEntry json_entry;
+        SyslogEntry syslog_entry;
+        // NginxErrorEntry nginx_entry;
+        if (parse_apache_log(current_line, &apache_entry) == 0)
+        {
+          classify_apache_event(&apache_entry, &event);
+          matched_events++;
+          type_of_event[0]++;
+          severity_counts[event.severity]++;
+          if (event_matches_mode(&event, mode))
+          {
             print_event(&event, mode);
+          }
+        }
+        /* TO DO: Add Nginx parser and classifier and uncomment this block
+        else if (parse_nginx_error(current_line, &nginx_entry) == 0) {
+            classify_nginx_event(&nginx_entry, &event);
             matched_events++;
             type_of_event[2]++;
             severity_counts[event.severity]++;
+            if(event_matches_mode(&event, mode)) {
+                print_event(&event, mode);
+            }
         }
-        continue;
-    }
-    printf("Not Nginx\n");
-    */
-    JSONLogEntry json_entry;
-    if (parse_json_log(line, &json_entry) == 0)
-    {
-      classify_json_event(&json_entry, &event);
-      matched_events++;
-      type_of_event[3]++;
-      severity_counts[event.severity]++;
-      if (event_matches_mode(&event, mode))
-      {
-        print_event(&event, mode);
-      }
-      continue;
-    }
-    // Attempt to match to Syslog
-    SyslogEntry syslog_entry;
-    if (parse_syslog(line, &syslog_entry) == 0)
-    {
-      classify_syslog_event(&syslog_entry, &event);
-      matched_events++;
-      type_of_event[1]++;
-      severity_counts[event.severity]++;
-      if (event_matches_mode(&event, mode))
-      {
-        print_event(&event, mode);
-      }
-      continue;
-    }
+        */
+        else if (parse_json_log(current_line, &json_entry) == 0)
+        {
+          classify_json_event(&json_entry, &event);
+          matched_events++;
+          type_of_event[3]++;
+          severity_counts[event.severity]++;
+          if (event_matches_mode(&event, mode))
+          {
+            print_event(&event, mode);
+          }
+        }
+        else if (parse_syslog(current_line, &syslog_entry) == 0)
+        {
+          classify_syslog_event(&syslog_entry, &event);
+          matched_events++;
+          type_of_event[1]++;
+          severity_counts[event.severity]++;
+          if (event_matches_mode(&event, mode))
+          {
+            print_event(&event, mode);
+          }
+        }
+        else
+        {
+          type_of_event[4]++;
+        }
 
-    type_of_event[4]++;
+        line_length = 0;
+      }
+    }
   }
 
-  fclose(fp);
+  close(source_fd);
 
   // Sumário
   printf("\n");

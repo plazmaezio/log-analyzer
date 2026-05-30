@@ -13,7 +13,8 @@
 #define MAX_URL_LENGTH 512
 #define MAX_MSG_LENGTH 1024
 
-typedef struct {
+typedef struct
+{
     char ip[MAX_IP_LENGTH];
     struct tm timestamp;
     char method[16];
@@ -25,9 +26,11 @@ typedef struct {
     char user_agent[256];
 } ApacheLogEntry;
 
-typedef struct {
+typedef struct
+{
     struct tm timestamp;
-    enum {
+    enum
+    {
         LOG_DEBUG = 0,
         LOG_INFO = 1,
         LOG_WARN = 2,
@@ -40,7 +43,8 @@ typedef struct {
     int user_id;
 } JSONLogEntry;
 
-typedef struct {
+typedef struct
+{
     int priority;
     struct tm timestamp;
     char hostname[256];
@@ -52,9 +56,11 @@ typedef struct {
     bool is_firewall_block;
 } SyslogEntry;
 
-typedef struct {
+typedef struct
+{
     struct tm timestamp;
-    enum {
+    enum
+    {
         NGINX_DEBUG = 0,
         NGINX_INFO = 1,
         NGINX_NOTICE = 2,
@@ -73,13 +79,13 @@ typedef struct {
     char request[MAX_URL_LENGTH];
 } NginxErrorEntry;
 
-int parse_apache_log(const char* line, ApacheLogEntry* entry);
-int parse_json_log(const char* line, JSONLogEntry* entry);
-int parse_syslog(const char* line, SyslogEntry* entry);
-int parse_nginx_error(const char* line, NginxErrorEntry* entry);
+int parse_apache_log(const char *line, ApacheLogEntry *entry);
+int parse_json_log(const char *line, JSONLogEntry *entry);
+int parse_syslog(const char *line, SyslogEntry *entry);
+int parse_nginx_error(const char *line, NginxErrorEntry *entry);
 
-int parse_apache_timestamp(const char* timestamp_str, struct tm* tm_out);
-int parse_iso8601_timestamp(const char* timestamp_str, struct tm* tm_out);
-int parse_syslog_timestamp(const char* timestamp_str, struct tm* tm_out);
+int parse_apache_timestamp(const char *timestamp_str, struct tm *tm_out);
+int parse_iso8601_timestamp(const char *timestamp_str, struct tm *tm_out);
+int parse_syslog_timestamp(const char *timestamp_str, struct tm *tm_out);
 
 #endif
